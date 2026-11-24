@@ -94,7 +94,8 @@ def report_drift(event: str) -> None:
     _drift_events[event] = None
     logger.warning(
         "server introspection: %s. This vLLM version differs from the one this "
-        "package was written against, the affected field is reported as null.",
+        "package was written against, the affected field is reported as null "
+        "or derived from a fallback.",
         event,
     )
 

@@ -85,7 +85,9 @@ Post profiling KV cache capacity and attention group structure, gathered once at
 
 Against a vLLM build without `EngineClient.get_kv_cache_group_metadata()` ([vllm-project/vllm#48121](https://github.com/vllm-project/vllm/pull/48121)), this plugin falls back to capacity only fields read directly off `vllm_config.cache_config` and returns an empty `groups`.
 
-`kv_cache_size_tokens` and `max_concurrency` are the group aware capacity vLLM itself logs at startup (`cache_config.kv_cache_size_tokens` / `kv_cache_max_concurrency`). On a vLLM that does not resolve them they are derived from `num_gpu_blocks * block_size`, which is exact only for models with a single KV cache group.
+`kv_cache_size_tokens` and `max_concurrency` are the group aware capacity vLLM itself logs at startup (`cache_config.kv_cache_size_tokens` / `kv_cache_max_concurrency`). If they are unset they are derived from `num_gpu_blocks * block_size`, which is exact only for models with a single KV cache group; a missing field is reported as drift and takes the same fallback.
+
+With data parallel engines behind one API server, `kv_cache_size_tokens` and `max_concurrency` are per engine (matching vLLM's startup log and `vllm:cache_config_info`), while `num_gpu_blocks` is summed across engines, so `num_gpu_blocks * block_size` does not equal `kv_cache_size_tokens` there.
 
 ```jsonc
 {

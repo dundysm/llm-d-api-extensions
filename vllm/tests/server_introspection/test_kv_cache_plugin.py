@@ -261,25 +261,30 @@ class TestCapacityFromVllmConfig:
         assert data["num_gpu_blocks"] == 1024
         assert not drift_events()
 
-    def test_unresolved_group_aware_capacity_falls_back_to_block_pool(self):
+    @pytest.mark.parametrize("missing", [False, True], ids=["unset", "missing"])
+    def test_group_aware_capacity_falls_back_to_block_pool(self, missing):
         cfg = _make_vllm_config(num_gpu_blocks=1024, block_size=16, max_model_len=4096)
+        if missing:
+            del cfg.cache_config.kv_cache_size_tokens
+            del cfg.cache_config.kv_cache_max_concurrency
         data = _capacity_from_vllm_config(cfg)
         assert data["kv_cache_size_tokens"] == 16384
         assert data["max_concurrency"] == pytest.approx(4.0)
-        assert not drift_events()
+        # Unset values are an expected state; missing fields are drift.
+        expected = (
+            [
+                "SimpleNamespace.kv_cache_size_tokens is not available",
+                "SimpleNamespace.kv_cache_max_concurrency is not available",
+            ]
+            if missing
+            else []
+        )
+        assert drift_events() == expected
 
     def test_partially_resolved_group_aware_capacity_is_not_mixed(self):
         cfg = _make_vllm_config(
             num_gpu_blocks=1024, block_size=16, max_model_len=4096, kv_cache_size_tokens=12787
         )
-        data = _capacity_from_vllm_config(cfg)
-        assert data["kv_cache_size_tokens"] == 16384
-        assert data["max_concurrency"] == pytest.approx(4.0)
-
-    def test_older_vllm_without_group_aware_capacity_falls_back(self):
-        cfg = _make_vllm_config(num_gpu_blocks=1024, block_size=16, max_model_len=4096)
-        del cfg.cache_config.kv_cache_size_tokens
-        del cfg.cache_config.kv_cache_max_concurrency
         data = _capacity_from_vllm_config(cfg)
         assert data["kv_cache_size_tokens"] == 16384
         assert data["max_concurrency"] == pytest.approx(4.0)

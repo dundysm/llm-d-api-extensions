@@ -12,9 +12,15 @@ frontend's config).
 `kv_cache_size_tokens` and `max_concurrency` are the group aware values vLLM
 itself logs and exports (`cache_config.kv_cache_size_tokens` /
 `kv_cache_max_concurrency`). `num_gpu_blocks * block_size` is only used when
-vLLM did not resolve them, since it overstates capacity for models whose
+they are `None` or missing, since it overstates capacity for models whose
 requests hold blocks in more than one KV cache group (sliding window, mamba
-and other hybrid models).
+and other hybrid models). Both fields exist on every vLLM that supports
+endpoint plugins, so a missing one is reported as drift.
+
+With data parallel engines behind one API server, `kv_cache_size_tokens` and
+`max_concurrency` are per engine (they match vLLM's startup log and
+`vllm:cache_config_info`) while `num_gpu_blocks` is summed across engines, so
+`num_gpu_blocks * block_size` does not equal `kv_cache_size_tokens` there.
 
 `groups` is sourced separately from `engine_client.get_kv_cache_group_metadata()`
 once at startup and cached for the server's lifetime (immutable once
@@ -141,8 +147,9 @@ def _capacity_from_vllm_config(vllm_config: "VllmConfig | None") -> dict:
     kv_cache_size_tokens = read_attr(cache_cfg, "kv_cache_size_tokens")
     max_concurrency = read_attr(cache_cfg, "kv_cache_max_concurrency")
     if not _is_number(kv_cache_size_tokens) or not _is_number(max_concurrency):
-        # Not resolved (no engine handshake yet, or an older vLLM), so derive
-        # both from the block pool, which is exact for single group models.
+        # Unset or missing (a missing field was reported as drift by
+        # `read_attr`), so derive both from the block pool, which is exact for
+        # single group models. Both come from one source, never mixed.
         kv_cache_size_tokens = (
             num_gpu_blocks * block_size
             if _is_number(num_gpu_blocks) and _is_number(block_size)

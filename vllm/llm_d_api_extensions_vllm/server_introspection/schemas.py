@@ -204,6 +204,14 @@ KVCacheGroupSpec = Annotated[
 
 
 class KVCacheResponse(BaseModel):
+    """Post profiling KV cache capacity and group structure.
+
+    `kv_cache_size_tokens` and `max_concurrency` are vLLM's group aware values
+    and, with data parallel engines behind one API server, are per engine.
+    `num_gpu_blocks` is summed across engines, so with DP it does not equal
+    `kv_cache_size_tokens / block_size`.
+    """
+
     kv_cache_size_tokens: int | None = None
     max_concurrency: float | None = None
     num_gpu_blocks: int | None = None
